@@ -822,6 +822,422 @@ func TestDecodeArrayWithNegativeIntegerKeys(t *testing.T) {
 	assertEqualString(t, m["-5"], "val")
 }
 
+// --- Array key types (covering decodeArrayKey branches) ---
+
+func TestDecodeArrayKeyString16(t *testing.T) {
+	data := makePayload(
+		0x14, 0x01,
+		0x12, 0x00, 0x02, 'a', 'b', // key: String16 "ab"
+		0x06, 0x01, // value: int 1
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+	m := val.(map[string]any)
+	assertEqualInt64(t, m["ab"], 1)
+}
+
+func TestDecodeArrayKeyString32(t *testing.T) {
+	data := makePayload(
+		0x14, 0x01,
+		0x13, 0x00, 0x00, 0x00, 0x02, 'c', 'd', // key: String32 "cd"
+		0x06, 0x02, // value: int 2
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+	m := val.(map[string]any)
+	assertEqualInt64(t, m["cd"], 2)
+}
+
+func TestDecodeArrayKeyStringEmpty(t *testing.T) {
+	data := makePayload(
+		0x14, 0x01,
+		0x0D,       // key: StringEmpty
+		0x06, 0x07, // value: int 7
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+	m := val.(map[string]any)
+	assertEqualInt64(t, m[""], 7)
+}
+
+func TestDecodeArrayKeyStringID16(t *testing.T) {
+	data := makePayload(
+		0x14, 0x02,
+		0x11, 0x01, 'k', // key: String8 "k" (ID 0)
+		0x06, 0x01, // value: 1
+		0x0F, 0x00, 0x00, // key: StringID16 -> ID 0 ("k")
+		0x06, 0x02, // value: 2
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+	m := val.(map[string]any)
+	assertEqualInt64(t, m["k"], 2) // second write overwrites
+}
+
+func TestDecodeArrayKeyStringID32(t *testing.T) {
+	data := makePayload(
+		0x14, 0x02,
+		0x11, 0x01, 'k', // key: String8 "k" (ID 0)
+		0x06, 0x01, // value: 1
+		0x10, 0x00, 0x00, 0x00, 0x00, // key: StringID32 -> ID 0 ("k")
+		0x06, 0x02, // value: 2
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+	m := val.(map[string]any)
+	assertEqualInt64(t, m["k"], 2)
+}
+
+func TestDecodeArrayKeyPosInt16(t *testing.T) {
+	data := makePayload(
+		0x14, 0x01,
+		0x08, 0x01, 0x00, // key: PosInt16 = 256
+		0x11, 0x01, 'v', // value: "v"
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+	m := val.(map[string]any)
+	assertEqualString(t, m["256"], "v")
+}
+
+func TestDecodeArrayKeyNegInt16(t *testing.T) {
+	data := makePayload(
+		0x14, 0x01,
+		0x09, 0x01, 0x00, // key: NegInt16 = -256
+		0x11, 0x01, 'v', // value: "v"
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+	m := val.(map[string]any)
+	assertEqualString(t, m["-256"], "v")
+}
+
+func TestDecodeArrayKeyPosInt32(t *testing.T) {
+	data := makePayload(
+		0x14, 0x01,
+		0x0A, 0x00, 0x01, 0x00, 0x00, // key: PosInt32 = 65536
+		0x11, 0x01, 'v', // value: "v"
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+	m := val.(map[string]any)
+	assertEqualString(t, m["65536"], "v")
+}
+
+func TestDecodeArrayKeyNegInt32(t *testing.T) {
+	data := makePayload(
+		0x14, 0x01,
+		0x0B, 0x00, 0x01, 0x00, 0x00, // key: NegInt32 = -65536
+		0x11, 0x01, 'v', // value: "v"
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+	m := val.(map[string]any)
+	assertEqualString(t, m["-65536"], "v")
+}
+
+func TestDecodeArrayKeyPosInt64(t *testing.T) {
+	data := makePayload(
+		0x14, 0x01,
+		0x20, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, // key: PosInt64 = 4294967296
+		0x11, 0x01, 'v', // value: "v"
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+	m := val.(map[string]any)
+	assertEqualString(t, m["4294967296"], "v")
+}
+
+func TestDecodeArrayKeyNegInt64(t *testing.T) {
+	data := makePayload(
+		0x14, 0x01,
+		0x21, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, // key: NegInt64 = -4294967296
+		0x11, 0x01, 'v', // value: "v"
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+	m := val.(map[string]any)
+	assertEqualString(t, m["-4294967296"], "v")
+}
+
+func TestDecodeArrayKeyUnsupported(t *testing.T) {
+	data := makePayload(
+		0x14, 0x01,
+		0x0C, // key: TypeDouble (unsupported as array key)
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x06, 0x01,
+	)
+	_, err := igbinary.Decode(data)
+	if err == nil {
+		t.Fatal("expected error for unsupported array key type")
+	}
+}
+
+// --- ObjectID16 and ObjectID32 ---
+
+func TestDecodeObjectByID16(t *testing.T) {
+	data := makePayload(
+		0x14, 0x02,
+		0x11, 0x01, 'a', // key: "a" (string ID 0)
+		0x17, 0x03, 'C', 'l', 's', // TypeObject8, class "Cls" (string ID 1)
+		0x14, 0x00, // 0 properties
+		0x11, 0x01, 'b', // key: "b" (string ID 2)
+		0x1B, 0x00, 0x01, // TypeObjectID16, class string ID 1 -> "Cls"
+		0x14, 0x01, // 1 property
+		0x11, 0x01, 'x', // key: "x" (string ID 3)
+		0x06, 0x05, // value: int 5
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+
+	m := val.(map[string]any)
+	objB := m["b"].(map[string]any)
+	assertEqualString(t, objB[igbinary.ClassKey], "Cls")
+	assertEqualInt64(t, objB["x"], 5)
+}
+
+func TestDecodeObjectByID32(t *testing.T) {
+	data := makePayload(
+		0x14, 0x02,
+		0x11, 0x01, 'a', // key: "a" (string ID 0)
+		0x17, 0x03, 'C', 'l', 's', // TypeObject8, class "Cls" (string ID 1)
+		0x14, 0x00, // 0 properties
+		0x11, 0x01, 'b', // key: "b" (string ID 2)
+		0x1C, 0x00, 0x00, 0x00, 0x01, // TypeObjectID32, class string ID 1 -> "Cls"
+		0x14, 0x01, // 1 property
+		0x11, 0x01, 'y', // key: "y" (string ID 3)
+		0x06, 0x09, // value: int 9
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+
+	m := val.(map[string]any)
+	objB := m["b"].(map[string]any)
+	assertEqualString(t, objB[igbinary.ClassKey], "Cls")
+	assertEqualInt64(t, objB["y"], 9)
+}
+
+func TestDecodeObjectByIDInvalidClassID(t *testing.T) {
+	// ObjectID8 referencing class ID 99 when string table is empty
+	data := makePayload(
+		0x1A, 0x63, // TypeObjectID8, class string ID 99
+		0x14, 0x00,
+	)
+	_, err := igbinary.Decode(data)
+	if err == nil {
+		t.Fatal("expected error for invalid class ID")
+	}
+}
+
+// --- Object with Array16/Array32 property counts ---
+
+func TestDecodeObjectWithArray16Properties(t *testing.T) {
+	data := makePayload(
+		0x17, 0x03, 'F', 'o', 'o', // TypeObject8, class "Foo"
+		0x15, 0x00, 0x01, // TypeArray16, count=1
+		0x11, 0x01, 'x', // key: "x"
+		0x06, 0x01, // value: 1
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+	m := val.(map[string]any)
+	assertEqualString(t, m[igbinary.ClassKey], "Foo")
+	assertEqualInt64(t, m["x"], 1)
+}
+
+func TestDecodeObjectWithArray32Properties(t *testing.T) {
+	data := makePayload(
+		0x17, 0x03, 'F', 'o', 'o', // TypeObject8, class "Foo"
+		0x16, 0x00, 0x00, 0x00, 0x01, // TypeArray32, count=1
+		0x11, 0x01, 'x', // key: "x"
+		0x06, 0x02, // value: 2
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+	m := val.(map[string]any)
+	assertEqualString(t, m[igbinary.ClassKey], "Foo")
+	assertEqualInt64(t, m["x"], 2)
+}
+
+// --- Serialized object data length variations ---
+
+func TestDecodeObjectSerializedString16DataLen(t *testing.T) {
+	data := makePayload(
+		0x1D, 0x03, 'B', 'a', 'r', // TypeObjectSer8, class "Bar"
+		0x12, 0x00, 0x03, 'a', 'b', 'c', // TypeString16, len=3, data "abc"
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+	m := val.(map[string]any)
+	assertEqualString(t, m[igbinary.ClassKey], "Bar")
+	assertEqualString(t, m[igbinary.SerializedDataKey], "abc")
+}
+
+func TestDecodeObjectSerializedString32DataLen(t *testing.T) {
+	data := makePayload(
+		0x1D, 0x03, 'B', 'a', 'r', // TypeObjectSer8, class "Bar"
+		0x13, 0x00, 0x00, 0x00, 0x02, 'o', 'k', // TypeString32, len=2, data "ok"
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+	m := val.(map[string]any)
+	assertEqualString(t, m[igbinary.ClassKey], "Bar")
+	assertEqualString(t, m[igbinary.SerializedDataKey], "ok")
+}
+
+func TestDecodeObjectSerializedInvalidDataLenCode(t *testing.T) {
+	data := makePayload(
+		0x1D, 0x03, 'B', 'a', 'r', // TypeObjectSer8, class "Bar"
+		0x06, 0x01, // WRONG: int type instead of string type for data length
+	)
+	_, err := igbinary.Decode(data)
+	if err == nil {
+		t.Fatal("expected error for invalid serialized data length code")
+	}
+	if !errors.Is(err, igbinary.ErrInvalidSerializedData) {
+		t.Errorf("expected ErrInvalidSerializedData, got: %v", err)
+	}
+}
+
+// --- Strict mode for all ref types ---
+
+func TestStrictModeRejectsObjectRef8(t *testing.T) {
+	dec := igbinary.NewDecoder(igbinary.WithStrictMode(true))
+	data := makePayload(0x22, 0x00) // TypeObjectRef8
+	_, err := dec.Decode(data)
+	if err == nil {
+		t.Fatal("expected error in strict mode for object ref8")
+	}
+}
+
+func TestStrictModeRejectsArrayRef16(t *testing.T) {
+	dec := igbinary.NewDecoder(igbinary.WithStrictMode(true))
+	data := makePayload(0x02, 0x00, 0x00) // TypeArrayRef16
+	_, err := dec.Decode(data)
+	if err == nil {
+		t.Fatal("expected error in strict mode for array ref16")
+	}
+}
+
+func TestStrictModeRejectsArrayRef32(t *testing.T) {
+	dec := igbinary.NewDecoder(igbinary.WithStrictMode(true))
+	data := makePayload(0x03, 0x00, 0x00, 0x00, 0x00) // TypeArrayRef32
+	_, err := dec.Decode(data)
+	if err == nil {
+		t.Fatal("expected error in strict mode for array ref32")
+	}
+}
+
+func TestStrictModeRejectsObjectRef16(t *testing.T) {
+	dec := igbinary.NewDecoder(igbinary.WithStrictMode(true))
+	data := makePayload(0x23, 0x00, 0x00) // TypeObjectRef16
+	_, err := dec.Decode(data)
+	if err == nil {
+		t.Fatal("expected error in strict mode for object ref16")
+	}
+}
+
+func TestStrictModeRejectsObjectRef32(t *testing.T) {
+	dec := igbinary.NewDecoder(igbinary.WithStrictMode(true))
+	data := makePayload(0x24, 0x00, 0x00, 0x00, 0x00) // TypeObjectRef32
+	_, err := dec.Decode(data)
+	if err == nil {
+		t.Fatal("expected error in strict mode for object ref32")
+	}
+}
+
+// --- Truncation errors for wider types ---
+
+func TestDecodeTruncatedUint32(t *testing.T) {
+	data := makePayload(0x0A, 0x00, 0x00) // PosInt32 but only 2 payload bytes
+	_, err := igbinary.Decode(data)
+	if err == nil {
+		t.Fatal("expected error for truncated uint32")
+	}
+	if !errors.Is(err, igbinary.ErrUnexpectedEnd) {
+		t.Errorf("expected ErrUnexpectedEnd, got: %v", err)
+	}
+}
+
+func TestDecodeTruncatedUint64(t *testing.T) {
+	data := makePayload(0x20, 0x00, 0x00, 0x00) // PosInt64 but only 3 payload bytes
+	_, err := igbinary.Decode(data)
+	if err == nil {
+		t.Fatal("expected error for truncated uint64")
+	}
+	if !errors.Is(err, igbinary.ErrUnexpectedEnd) {
+		t.Errorf("expected ErrUnexpectedEnd, got: %v", err)
+	}
+}
+
+func TestDecodeTruncatedDouble(t *testing.T) {
+	data := makePayload(0x0C, 0x00, 0x00) // Double but only 2 payload bytes
+	_, err := igbinary.Decode(data)
+	if err == nil {
+		t.Fatal("expected error for truncated double")
+	}
+	if !errors.Is(err, igbinary.ErrUnexpectedEnd) {
+		t.Errorf("expected ErrUnexpectedEnd, got: %v", err)
+	}
+}
+
+func TestDecodeTruncatedString16Length(t *testing.T) {
+	data := makePayload(0x12, 0x00) // String16 but only 1 byte of length
+	_, err := igbinary.Decode(data)
+	if err == nil {
+		t.Fatal("expected error for truncated string16 length")
+	}
+}
+
+func TestDecodeTruncatedString32Length(t *testing.T) {
+	data := makePayload(0x13, 0x00, 0x00) // String32 but only 2 bytes of length
+	_, err := igbinary.Decode(data)
+	if err == nil {
+		t.Fatal("expected error for truncated string32 length")
+	}
+}
+
+func TestDecodeTruncatedNegInt32(t *testing.T) {
+	data := makePayload(0x0B, 0x00) // NegInt32 but only 1 payload byte
+	_, err := igbinary.Decode(data)
+	if err == nil {
+		t.Fatal("expected error for truncated negative int32")
+	}
+}
+
+func TestDecodeTruncatedNegInt64(t *testing.T) {
+	data := makePayload(0x21, 0x00) // NegInt64 but only 1 payload byte
+	_, err := igbinary.Decode(data)
+	if err == nil {
+		t.Fatal("expected error for truncated negative int64")
+	}
+}
+
+// --- DecodeError without detail ---
+
+func TestDecodeErrorWithoutDetail(t *testing.T) {
+	e := &igbinary.DecodeError{Err: igbinary.ErrUnexpectedEnd, Pos: 5, Detail: ""}
+	expected := "igbinary: unexpected end of data at pos 5"
+	if e.Error() != expected {
+		t.Errorf("expected %q, got %q", expected, e.Error())
+	}
+}
+
+func TestDecodeErrorWithDetail(t *testing.T) {
+	e := &igbinary.DecodeError{Err: igbinary.ErrUnexpectedEnd, Pos: 10, Detail: "need 4 bytes"}
+	expected := "igbinary: unexpected end of data at pos 10: need 4 bytes"
+	if e.Error() != expected {
+		t.Errorf("expected %q, got %q", expected, e.Error())
+	}
+}
+
+func TestDecodeErrorUnwrap(t *testing.T) {
+	e := &igbinary.DecodeError{Err: igbinary.ErrInvalidHeader, Pos: 0}
+	if !errors.Is(e, igbinary.ErrInvalidHeader) {
+		t.Error("Unwrap should return the underlying error")
+	}
+}
+
 // --- Test helpers ---
 
 func assertNoError(t *testing.T, err error) {
