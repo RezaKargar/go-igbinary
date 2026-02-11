@@ -1,6 +1,9 @@
 package memcached_test
 
 import (
+	"bytes"
+	"compress/zlib"
+	"encoding/binary"
 	"testing"
 
 	"github.com/RezaKargar/go-igbinary/memcached"
@@ -159,5 +162,79 @@ func TestCodecFallbackSerializer(t *testing.T) {
 	}
 	if str != "raw data" {
 		t.Errorf("expected %q, got %q", "raw data", str)
+	}
+}
+
+func TestCodecDecodeCompressedZlib(t *testing.T) {
+	// Create igbinary data: header + int 42
+	igData := []byte{0x00, 0x00, 0x00, 0x02, 0x06, 0x2A}
+
+	// Compress with zlib
+	var buf bytes.Buffer
+	w := zlib.NewWriter(&buf)
+	if _, err := w.Write(igData); err != nil {
+		t.Fatal(err)
+	}
+	w.Close()
+
+	// Prepend 4-byte LE length prefix (PHP format)
+	lenBuf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(lenBuf, uint32(len(igData)))
+	lenBuf = append(lenBuf, buf.Bytes()...)
+	data := lenBuf
+
+	codec := memcached.NewCodec()
+	flags := memcached.FlagIgbinary | memcached.FlagCompressed | memcached.FlagZlib
+
+	val, err := codec.Decode(data, flags)
+	if err != nil {
+		t.Fatalf("Decode error: %v", err)
+	}
+	v, ok := val.(int64)
+	if !ok {
+		t.Fatalf("expected int64, got %T (%v)", val, val)
+	}
+	if v != 42 {
+		t.Errorf("expected 42, got %d", v)
+	}
+}
+
+func TestCodecDecompressError(t *testing.T) {
+	codec := memcached.NewCodec()
+	// Compressed flag set but data is invalid
+	flags := memcached.FlagIgbinary | memcached.FlagCompressed | memcached.FlagFastlz
+	_, err := codec.Decode([]byte{0x00, 0x00, 0x00, 0x10, 0xFF, 0xFF}, flags)
+	if err == nil {
+		t.Fatal("expected error for decompression failure")
+	}
+}
+
+func TestCodecFallbackCompressor(t *testing.T) {
+	// Compress "hello" with zlib (no length prefix)
+	var buf bytes.Buffer
+	w := zlib.NewWriter(&buf)
+	if _, err := w.Write([]byte("hello")); err != nil {
+		t.Fatal(err)
+	}
+	w.Close()
+
+	// Build codec with only a fallback compressor (no specific flag compressors)
+	codec := memcached.NewCodecBuilder().
+		WithFallbackCompressor(memcached.NewZlibCompressor(false)).
+		WithSerializer(memcached.FlagString, &memcached.StringSerializer{}).
+		Build()
+
+	// Use FlagCompressed without a specific compression flag bit
+	flags := memcached.FlagString | memcached.FlagCompressed
+	val, err := codec.Decode(buf.Bytes(), flags)
+	if err != nil {
+		t.Fatalf("Decode error: %v", err)
+	}
+	str, ok := val.(string)
+	if !ok {
+		t.Fatalf("expected string, got %T", val)
+	}
+	if str != "hello" {
+		t.Errorf("expected %q, got %q", "hello", str)
 	}
 }
