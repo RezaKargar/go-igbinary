@@ -77,7 +77,9 @@ func (c *ZlibCompressor) Decompress(data []byte) ([]byte, error) {
 			return nil, fmt.Errorf("memcached: zlib reader: %w", err)
 		}
 	}
-	defer r.Close()
+	defer func(r io.ReadCloser) {
+		_ = r.Close() //nolint:errcheck
+	}(r)
 
 	bufSize := int(uncompressedLen)
 	if bufSize == 0 {
