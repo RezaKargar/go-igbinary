@@ -1,6 +1,7 @@
 # go-igbinary
 
 [![CI](https://github.com/RezaKargar/go-igbinary/actions/workflows/ci.yml/badge.svg)](https://github.com/RezaKargar/go-igbinary/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/RezaKargar/go-igbinary/branch/main/graph/badge.svg)](https://codecov.io/gh/RezaKargar/go-igbinary)
 [![Go Reference](https://pkg.go.dev/badge/github.com/RezaKargar/go-igbinary.svg)](https://pkg.go.dev/github.com/RezaKargar/go-igbinary)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
