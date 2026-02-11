@@ -1,0 +1,16 @@
+services:
+  memcached:
+    image: memcached:1.6-alpine
+    ports:
+      - "${MEMCACHED_PORT:-11211}:11211"
+
+  php-writer:
+    build:
+      context: ./php
+    depends_on:
+      - memcached
+    environment:
+      MEMCACHED_HOST: memcached
+      MEMCACHED_PORT: "11211"
+    # Runs the PHP script once to populate memcached, then exits
+    command: ["php", "/app/write_cache.php"]

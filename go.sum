@@ -1,0 +1,10 @@
+github.com/bradfitz/gomemcache v0.0.0-20250403215159-8d39553ac7cf h1:TqhNAT4zKbTdLa62d2HDBFdvgSbIGB3eJE8HqhgiL9I=
+github.com/bradfitz/gomemcache v0.0.0-20250403215159-8d39553ac7cf/go.mod h1:r5xuitiExdLAJ09PR7vBVENGvp4ZuTBeWTGtxuX3K+c=
+github.com/dgryski/go-fastlz v0.0.0-20160201071518-193d6e9e5e66 h1:xlzUKSDxjMgi+DbP9OFsQ4VxmMavs1NLzme2/rIY/R8=
+github.com/dgryski/go-fastlz v0.0.0-20160201071518-193d6e9e5e66/go.mod h1:xq/Wai54axZeiEvILy46JAaIHSrmqIZrSA6W+uJwXoE=
+github.com/fromYukki/fastlz v0.0.0-20150210071913-e529802b40b3 h1:2RUtVO97RWIOFQjy1MoVr1fQWxllvGhmOSw+Aj2se+g=
+github.com/fromYukki/fastlz v0.0.0-20150210071913-e529802b40b3/go.mod h1:BH62SQoc2UPFm5ChlwV/YKAt0feqJGItKNcVZoLoNDM=
+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
+gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
