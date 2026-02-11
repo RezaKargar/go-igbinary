@@ -18,7 +18,7 @@ test-cover:
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 
-## lint: Run golangci-lint
+## lint: Run golangci-lint (requires v2+)
 lint:
 	golangci-lint run ./...
 
