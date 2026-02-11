@@ -62,6 +62,162 @@ func TestStringSerializerEmpty(t *testing.T) {
 	}
 }
 
+// --- LongSerializer ---
+
+func TestLongSerializer(t *testing.T) {
+	s := &memcached.LongSerializer{}
+	val, err := s.Deserialize([]byte("42"))
+	if err != nil {
+		t.Fatalf("Deserialize error: %v", err)
+	}
+	v, ok := val.(int64)
+	if !ok {
+		t.Fatalf("expected int64, got %T", val)
+	}
+	if v != 42 {
+		t.Errorf("expected 42, got %d", v)
+	}
+}
+
+func TestLongSerializerNegative(t *testing.T) {
+	s := &memcached.LongSerializer{}
+	val, err := s.Deserialize([]byte("-42"))
+	if err != nil {
+		t.Fatalf("Deserialize error: %v", err)
+	}
+	v := val.(int64)
+	if v != -42 {
+		t.Errorf("expected -42, got %d", v)
+	}
+}
+
+func TestLongSerializerLarge(t *testing.T) {
+	s := &memcached.LongSerializer{}
+	val, err := s.Deserialize([]byte("9999999999"))
+	if err != nil {
+		t.Fatalf("Deserialize error: %v", err)
+	}
+	v := val.(int64)
+	if v != 9999999999 {
+		t.Errorf("expected 9999999999, got %d", v)
+	}
+}
+
+func TestLongSerializerEmpty(t *testing.T) {
+	s := &memcached.LongSerializer{}
+	val, err := s.Deserialize([]byte(""))
+	if err != nil {
+		t.Fatalf("Deserialize error: %v", err)
+	}
+	v := val.(int64)
+	if v != 0 {
+		t.Errorf("expected 0, got %d", v)
+	}
+}
+
+func TestLongSerializerInvalid(t *testing.T) {
+	s := &memcached.LongSerializer{}
+	_, err := s.Deserialize([]byte("not_a_number"))
+	if err == nil {
+		t.Fatal("expected error for invalid long")
+	}
+}
+
+// --- DoubleSerializer ---
+
+func TestDoubleSerializer(t *testing.T) {
+	s := &memcached.DoubleSerializer{}
+	val, err := s.Deserialize([]byte("3.14"))
+	if err != nil {
+		t.Fatalf("Deserialize error: %v", err)
+	}
+	v, ok := val.(float64)
+	if !ok {
+		t.Fatalf("expected float64, got %T", val)
+	}
+	if v != 3.14 {
+		t.Errorf("expected 3.14, got %f", v)
+	}
+}
+
+func TestDoubleSerializerNegative(t *testing.T) {
+	s := &memcached.DoubleSerializer{}
+	val, err := s.Deserialize([]byte("-1.5"))
+	if err != nil {
+		t.Fatalf("Deserialize error: %v", err)
+	}
+	v := val.(float64)
+	if v != -1.5 {
+		t.Errorf("expected -1.5, got %f", v)
+	}
+}
+
+func TestDoubleSerializerEmpty(t *testing.T) {
+	s := &memcached.DoubleSerializer{}
+	val, err := s.Deserialize([]byte(""))
+	if err != nil {
+		t.Fatalf("Deserialize error: %v", err)
+	}
+	v := val.(float64)
+	if v != 0 {
+		t.Errorf("expected 0, got %f", v)
+	}
+}
+
+func TestDoubleSerializerInvalid(t *testing.T) {
+	s := &memcached.DoubleSerializer{}
+	_, err := s.Deserialize([]byte("not_a_float"))
+	if err == nil {
+		t.Fatal("expected error for invalid double")
+	}
+}
+
+// --- BoolSerializer ---
+
+func TestBoolSerializerTrue(t *testing.T) {
+	s := &memcached.BoolSerializer{}
+	val, err := s.Deserialize([]byte("1"))
+	if err != nil {
+		t.Fatalf("Deserialize error: %v", err)
+	}
+	v, ok := val.(bool)
+	if !ok {
+		t.Fatalf("expected bool, got %T", val)
+	}
+	if !v {
+		t.Error("expected true")
+	}
+}
+
+func TestBoolSerializerFalse(t *testing.T) {
+	s := &memcached.BoolSerializer{}
+	val, err := s.Deserialize([]byte(""))
+	if err != nil {
+		t.Fatalf("Deserialize error: %v", err)
+	}
+	v, ok := val.(bool)
+	if !ok {
+		t.Fatalf("expected bool, got %T", val)
+	}
+	if v {
+		t.Error("expected false")
+	}
+}
+
+func TestBoolSerializerZero(t *testing.T) {
+	s := &memcached.BoolSerializer{}
+	val, err := s.Deserialize([]byte("0"))
+	if err != nil {
+		t.Fatalf("Deserialize error: %v", err)
+	}
+	v := val.(bool)
+	if v {
+		t.Error("expected false for '0'")
+	}
+}
+
+// --- JSONSerializer ---
+
 func TestJSONSerializer(t *testing.T) {
 	s := &memcached.JSONSerializer{}
 	val, err := s.Deserialize([]byte(`{"name":"Alice","age":30}`))
