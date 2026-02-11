@@ -96,6 +96,124 @@ echo "Set test:empty_array\n";
 $mc->set('test:empty_string', '');
 echo "Set test:empty_string\n";
 
+// --- PHP class objects ---
+
+// 15. Simple stdClass object
+$obj = new stdClass();
+$obj->name = 'Charlie';
+$obj->age = 25;
+$obj->active = true;
+$mc->set('test:stdclass', $obj);
+echo "Set test:stdclass\n";
+
+// 16. Custom class - simple
+class Product {
+    public int $id;
+    public string $title;
+    public float $price;
+    public bool $inStock;
+
+    public function __construct(int $id, string $title, float $price, bool $inStock) {
+        $this->id = $id;
+        $this->title = $title;
+        $this->price = $price;
+        $this->inStock = $inStock;
+    }
+}
+
+$product = new Product(42, 'Widget', 19.99, true);
+$mc->set('test:product', $product);
+echo "Set test:product\n";
+
+// 17. Class with nested object
+class Address {
+    public string $street;
+    public string $city;
+    public string $country;
+
+    public function __construct(string $street, string $city, string $country) {
+        $this->street = $street;
+        $this->city = $city;
+        $this->country = $country;
+    }
+}
+
+class User {
+    public int $id;
+    public string $name;
+    public ?string $email;
+    public Address $address;
+    public array $roles;
+
+    public function __construct(int $id, string $name, ?string $email, Address $address, array $roles) {
+        $this->id = $id;
+        $this->name = $name;
+        $this->email = $email;
+        $this->address = $address;
+        $this->roles = $roles;
+    }
+}
+
+$addr = new Address('123 Main St', 'Springfield', 'US');
+$user = new User(1, 'Alice', 'alice@example.com', $addr, ['admin', 'editor']);
+$mc->set('test:user_obj', $user);
+echo "Set test:user_obj\n";
+
+// 18. Class with null property
+$userNoEmail = new User(2, 'Bob', null, new Address('456 Oak Ave', 'Portland', 'US'), ['viewer']);
+$mc->set('test:user_null_prop', $userNoEmail);
+echo "Set test:user_null_prop\n";
+
+// 19. Inheritance
+class Animal {
+    public string $species;
+    public int $legs;
+
+    public function __construct(string $species, int $legs) {
+        $this->species = $species;
+        $this->legs = $legs;
+    }
+}
+
+class Dog extends Animal {
+    public string $breed;
+    public string $name;
+
+    public function __construct(string $breed, string $name) {
+        parent::__construct('Canis familiaris', 4);
+        $this->breed = $breed;
+        $this->name = $name;
+    }
+}
+
+$dog = new Dog('Labrador', 'Rex');
+$mc->set('test:dog', $dog);
+echo "Set test:dog\n";
+
+// 20. Array of objects (multiple instances of same class)
+$products = [
+    new Product(1, 'Alpha', 10.00, true),
+    new Product(2, 'Beta', 20.50, false),
+    new Product(3, 'Gamma', 30.99, true),
+];
+$mc->set('test:product_list', $products);
+echo "Set test:product_list\n";
+
+// 21. Object with empty array property
+class Container {
+    public string $label;
+    public array $items;
+
+    public function __construct(string $label, array $items) {
+        $this->label = $label;
+        $this->items = $items;
+    }
+}
+
+$empty = new Container('empty box', []);
+$mc->set('test:empty_container', $empty);
+echo "Set test:empty_container\n";
+
 // Now also write with compression enabled for the compressed test
 $mc->setOption(Memcached::OPT_COMPRESSION, true);
 
