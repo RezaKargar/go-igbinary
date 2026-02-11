@@ -1,0 +1,5 @@
+# Integration test configuration defaults.
+# These can be overridden by environment variables or a .env file.
+memcached:
+  host: "localhost"
+  port: 11211
