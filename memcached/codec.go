@@ -28,6 +28,9 @@ func NewCodec() *Codec {
 		WithSerializer(FlagIgbinary, &IgbinarySerializer{}).
 		WithSerializer(FlagString, &StringSerializer{}).
 		WithSerializer(FlagJSON, &JSONSerializer{}).
+		WithSerializer(FlagLong, &LongSerializer{}).
+		WithSerializer(FlagDouble, &DoubleSerializer{}).
+		WithSerializer(FlagBool, &BoolSerializer{}).
 		WithFallbackCompressor(&FastlzCompressor{}).
 		WithFallbackSerializer(&IgbinarySerializer{}).
 		Build()
@@ -40,7 +43,7 @@ func NewCodec() *Codec {
 //  1. If [IsCompressed](flags), decompress using the matching [Compressor].
 //  2. Deserialize using the matching [Serializer] for [SerializerType](flags).
 func (c *Codec) Decode(data []byte, flags uint32) (any, error) {
-	if len(data) == 0 {
+	if data == nil {
 		return nil, nil
 	}
 

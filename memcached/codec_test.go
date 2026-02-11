@@ -64,14 +64,19 @@ func TestCodecDecodeRawString(t *testing.T) {
 	}
 }
 
-func TestCodecDecodeEmptyData(t *testing.T) {
+func TestCodecDecodeEmptyBoolFalse(t *testing.T) {
+	// PHP stores false as empty bytes with FlagBool
 	codec := memcached.NewCodec()
-	val, err := codec.Decode([]byte{}, 5)
+	val, err := codec.Decode([]byte{}, memcached.FlagBool)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if val != nil {
-		t.Errorf("expected nil, got %v", val)
+	v, ok := val.(bool)
+	if !ok {
+		t.Fatalf("expected bool, got %T (%v)", val, val)
+	}
+	if v {
+		t.Error("expected false")
 	}
 }
 
