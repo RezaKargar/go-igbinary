@@ -191,7 +191,9 @@ func (r *reader) decodeValue() (any, error) {
 
 	// Strings
 	case TypeStringEmpty:
-		r.strings = append(r.strings, "")
+		// Empty strings are NOT registered in the dedup table.
+		// PHP igbinary uses type_string_empty as a special marker
+		// that does not occupy a slot in the string table.
 		return "", nil
 	case TypeString8:
 		return r.decodeNewString8()
@@ -358,7 +360,7 @@ func (r *reader) decodeArrayKey() (string, error) {
 	switch code {
 	// String keys
 	case TypeStringEmpty:
-		r.strings = append(r.strings, "")
+		// Empty strings are NOT registered in the dedup table.
 		return "", nil
 	case TypeString8:
 		return r.decodeNewString8()
