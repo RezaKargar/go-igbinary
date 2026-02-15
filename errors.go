@@ -38,6 +38,10 @@ var (
 	// ErrUnsupportedArrayKey is returned when an array key uses an unsupported
 	// type code (only string and integer keys are supported).
 	ErrUnsupportedArrayKey = errors.New("igbinary: unsupported array key type")
+
+	// ErrValueRefOutOfRange is returned when an array/object back-reference ID
+	// exceeds the number of compound values seen so far.
+	ErrValueRefOutOfRange = errors.New("igbinary: value reference ID out of range")
 )
 
 // DecodeError wraps a sentinel error with positional context about where

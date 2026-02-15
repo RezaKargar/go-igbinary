@@ -81,6 +81,7 @@ type reader struct {
 	data    []byte
 	pos     int
 	strings []string // string deduplication table
+	values  []any    // compound value reference table (arrays and objects)
 	strict  bool
 }
 
@@ -315,14 +316,22 @@ func (r *reader) lookupString(id int) (string, error) {
 	return r.strings[id], nil
 }
 
+func (r *reader) lookupValue(id int) (any, error) {
+	if id < 0 || id >= len(r.values) {
+		return nil, newError(ErrValueRefOutOfRange, r.pos,
+			fmt.Sprintf("ID %d, table size %d", id, len(r.values)))
+	}
+	return r.values[id], nil
+}
+
 // --- Array decoding ---
 
 func (r *reader) decodeArray(size int) (any, error) {
-	if size == 0 {
-		return map[string]any{}, nil
-	}
-
 	m := make(map[string]any, size)
+	// Register in the values table before populating so that back-references
+	// from nested values can resolve to this map (handles circular refs).
+	r.values = append(r.values, m)
+
 	for i := 0; i < size; i++ {
 		key, err := r.decodeArrayKey()
 		if err != nil {
@@ -490,6 +499,9 @@ func (r *reader) decodeObjectProperties(className string) (any, error) {
 
 	m := make(map[string]any, propCount+1)
 	m[ClassKey] = className
+	// Register in the values table before populating so that back-references
+	// from nested values can resolve to this object.
+	r.values = append(r.values, m)
 
 	for i := 0; i < propCount; i++ {
 		key, keyErr := r.decodeArrayKey()
@@ -558,37 +570,34 @@ func (r *reader) decodeObjectSerialized(code byte) (any, error) {
 		return nil, err
 	}
 
-	return map[string]any{
+	m := map[string]any{
 		ClassKey:          className,
 		SerializedDataKey: string(raw),
-	}, nil
+	}
+	r.values = append(r.values, m)
+	return m, nil
 }
 
 // --- Reference decoding ---
 
 func (r *reader) decodeRef(code byte) (any, error) {
+	var id int
+	var err error
 	switch code {
 	case TypeArrayRef8, TypeObjectRef8:
-		_, err := r.readUint8()
-		if r.strict && err == nil {
-			return nil, newError(ErrUnknownType, r.pos-2,
-				"references are not fully resolved in strict mode")
-		}
-		return nil, err
+		v, e := r.readUint8()
+		id, err = int(v), e
 	case TypeArrayRef16, TypeObjectRef16:
-		_, err := r.readUint16()
-		if r.strict && err == nil {
-			return nil, newError(ErrUnknownType, r.pos-3,
-				"references are not fully resolved in strict mode")
-		}
-		return nil, err
+		v, e := r.readUint16()
+		id, err = int(v), e
 	case TypeArrayRef32, TypeObjectRef32:
-		_, err := r.readUint32()
-		if r.strict && err == nil {
-			return nil, newError(ErrUnknownType, r.pos-5,
-				"references are not fully resolved in strict mode")
-		}
+		v, e := r.readUint32()
+		id, err = int(v), e
+	default:
+		return nil, nil
+	}
+	if err != nil {
 		return nil, err
 	}
-	return nil, nil
+	return r.lookupValue(id)
 }

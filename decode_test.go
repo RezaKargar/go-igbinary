@@ -382,22 +382,27 @@ func TestDecodeSerializedObject(t *testing.T) {
 
 // --- References ---
 
-func TestDecodeArrayRef(t *testing.T) {
-	// References currently decode as nil (non-strict mode)
+func TestDecodeArrayRefOutOfRange(t *testing.T) {
+	// A bare ArrayRef8 with no prior arrays should return ErrValueRefOutOfRange.
 	data := makePayload(0x01, 0x00) // TypeArrayRef8, ID 0
-	val, err := igbinary.Decode(data)
-	assertNoError(t, err)
-	if val != nil {
-		t.Errorf("expected nil for array ref, got %v", val)
+	_, err := igbinary.Decode(data)
+	if err == nil {
+		t.Fatal("expected error for array ref with no prior values")
+	}
+	if !errors.Is(err, igbinary.ErrValueRefOutOfRange) {
+		t.Errorf("expected ErrValueRefOutOfRange, got: %v", err)
 	}
 }
 
-func TestDecodeObjectRef(t *testing.T) {
+func TestDecodeObjectRefOutOfRange(t *testing.T) {
+	// A bare ObjectRef8 with no prior objects should return ErrValueRefOutOfRange.
 	data := makePayload(0x22, 0x00) // TypeObjectRef8, ID 0
-	val, err := igbinary.Decode(data)
-	assertNoError(t, err)
-	if val != nil {
-		t.Errorf("expected nil for object ref, got %v", val)
+	_, err := igbinary.Decode(data)
+	if err == nil {
+		t.Fatal("expected error for object ref with no prior values")
+	}
+	if !errors.Is(err, igbinary.ErrValueRefOutOfRange) {
+		t.Errorf("expected ErrValueRefOutOfRange, got: %v", err)
 	}
 }
 
@@ -769,41 +774,49 @@ func TestDecodeObjectSer32(t *testing.T) {
 	assertEqualString(t, m[igbinary.SerializedDataKey], "ok")
 }
 
-// --- Ref16, Ref32 ---
+// --- Ref16, Ref32 out-of-range ---
 
-func TestDecodeArrayRef16(t *testing.T) {
-	data := makePayload(0x02, 0x00, 0x00) // TypeArrayRef16
-	val, err := igbinary.Decode(data)
-	assertNoError(t, err)
-	if val != nil {
-		t.Errorf("expected nil, got %v", val)
+func TestDecodeArrayRef16OutOfRange(t *testing.T) {
+	data := makePayload(0x02, 0x00, 0x00) // TypeArrayRef16, ID 0
+	_, err := igbinary.Decode(data)
+	if err == nil {
+		t.Fatal("expected error for array ref16 with no prior values")
+	}
+	if !errors.Is(err, igbinary.ErrValueRefOutOfRange) {
+		t.Errorf("expected ErrValueRefOutOfRange, got: %v", err)
 	}
 }
 
-func TestDecodeArrayRef32(t *testing.T) {
-	data := makePayload(0x03, 0x00, 0x00, 0x00, 0x00) // TypeArrayRef32
-	val, err := igbinary.Decode(data)
-	assertNoError(t, err)
-	if val != nil {
-		t.Errorf("expected nil, got %v", val)
+func TestDecodeArrayRef32OutOfRange(t *testing.T) {
+	data := makePayload(0x03, 0x00, 0x00, 0x00, 0x00) // TypeArrayRef32, ID 0
+	_, err := igbinary.Decode(data)
+	if err == nil {
+		t.Fatal("expected error for array ref32 with no prior values")
+	}
+	if !errors.Is(err, igbinary.ErrValueRefOutOfRange) {
+		t.Errorf("expected ErrValueRefOutOfRange, got: %v", err)
 	}
 }
 
-func TestDecodeObjectRef16(t *testing.T) {
-	data := makePayload(0x23, 0x00, 0x00) // TypeObjectRef16
-	val, err := igbinary.Decode(data)
-	assertNoError(t, err)
-	if val != nil {
-		t.Errorf("expected nil, got %v", val)
+func TestDecodeObjectRef16OutOfRange(t *testing.T) {
+	data := makePayload(0x23, 0x00, 0x00) // TypeObjectRef16, ID 0
+	_, err := igbinary.Decode(data)
+	if err == nil {
+		t.Fatal("expected error for object ref16 with no prior values")
+	}
+	if !errors.Is(err, igbinary.ErrValueRefOutOfRange) {
+		t.Errorf("expected ErrValueRefOutOfRange, got: %v", err)
 	}
 }
 
-func TestDecodeObjectRef32(t *testing.T) {
-	data := makePayload(0x24, 0x00, 0x00, 0x00, 0x00) // TypeObjectRef32
-	val, err := igbinary.Decode(data)
-	assertNoError(t, err)
-	if val != nil {
-		t.Errorf("expected nil, got %v", val)
+func TestDecodeObjectRef32OutOfRange(t *testing.T) {
+	data := makePayload(0x24, 0x00, 0x00, 0x00, 0x00) // TypeObjectRef32, ID 0
+	_, err := igbinary.Decode(data)
+	if err == nil {
+		t.Fatal("expected error for object ref32 with no prior values")
+	}
+	if !errors.Is(err, igbinary.ErrValueRefOutOfRange) {
+		t.Errorf("expected ErrValueRefOutOfRange, got: %v", err)
 	}
 }
 
@@ -1235,6 +1248,204 @@ func TestDecodeErrorUnwrap(t *testing.T) {
 	e := &igbinary.DecodeError{Err: igbinary.ErrInvalidHeader, Pos: 0}
 	if !errors.Is(e, igbinary.ErrInvalidHeader) {
 		t.Error("Unwrap should return the underlying error")
+	}
+}
+
+// --- Reference resolution tests ---
+
+// TestDecodeArrayRefResolvesSharedArray mirrors the PHP promotion_pages scenario:
+// Two keys in the same map point to the same array value. igbinary encodes the
+// first as a full array and the second as an ArrayRef back-reference.
+//
+// PHP equivalent:
+//
+//	$arr = [42, 83];
+//	$data = ["landing_pages" => $arr, "promotion_pages" => $arr];
+//	// igbinary_serialize($data) uses ArrayRef for the second occurrence.
+func TestDecodeArrayRefResolvesSharedArray(t *testing.T) {
+	// Outer array (2 entries):
+	//   key "landing_pages" => inner array {0 => 42, 1 => 83}   (value ID 1, outer is ID 0)
+	//   key "promotion_pages" => ArrayRef8(1)                     (resolves to same inner array)
+	data := makePayload(
+		0x14, 0x02, // outer array, 2 entries (registered as value ID 0)
+		0x11, 0x0D, 'l', 'a', 'n', 'd', 'i', 'n', 'g', '_', 'p', 'a', 'g', 'e', 's', // key: "landing_pages"
+		0x14, 0x02, // inner array, 2 entries (registered as value ID 1)
+		0x06, 0x00, // key: int 0
+		0x06, 0x2A, // value: int 42
+		0x06, 0x01, // key: int 1
+		0x06, 0x53, // value: int 83
+		0x11, 0x0F, 'p', 'r', 'o', 'm', 'o', 't', 'i', 'o', 'n', '_', 'p', 'a', 'g', 'e', 's', // key: "promotion_pages"
+		0x01, 0x01, // TypeArrayRef8, ID 1 -> same inner array
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+
+	m := val.(map[string]any)
+	landing, ok := m["landing_pages"].(map[string]any)
+	if !ok {
+		t.Fatalf("landing_pages: expected map, got %T", m["landing_pages"])
+	}
+	promo, ok := m["promotion_pages"].(map[string]any)
+	if !ok {
+		t.Fatalf("promotion_pages: expected map, got %T (%v)", m["promotion_pages"], m["promotion_pages"])
+	}
+
+	// Both should contain the same data
+	assertEqualInt64(t, landing["0"], 42)
+	assertEqualInt64(t, landing["1"], 83)
+	assertEqualInt64(t, promo["0"], 42)
+	assertEqualInt64(t, promo["1"], 83)
+}
+
+// TestDecodeArrayRefSelfReference tests that an array can reference its own parent.
+func TestDecodeArrayRefSelfReference(t *testing.T) {
+	// Outer array (1 entry): key "self" => ArrayRef8(0) -> the outer array itself
+	data := makePayload(
+		0x14, 0x01, // outer array, 1 entry (value ID 0)
+		0x11, 0x04, 's', 'e', 'l', 'f', // key: "self"
+		0x01, 0x00, // TypeArrayRef8, ID 0 -> self
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+
+	m := val.(map[string]any)
+	selfRef, ok := m["self"].(map[string]any)
+	if !ok {
+		t.Fatalf("self: expected map, got %T", m["self"])
+	}
+	// The self-reference should point back to the same map instance
+	if selfRef["self"] == nil {
+		t.Fatal("self.self should not be nil (circular reference)")
+	}
+}
+
+// TestDecodeObjectRefResolution tests that TypeObjectRef resolves to a previously
+// decoded object.
+func TestDecodeObjectRefResolution(t *testing.T) {
+	// Outer array (2 entries):
+	//   key "obj1" => Object "Foo" with property "x" => 1   (value ID 1, outer array is 0)
+	//   key "obj2" => ObjectRef8(1)                          (resolves to same object)
+	data := makePayload(
+		0x14, 0x02, // outer array, 2 entries (value ID 0)
+		0x11, 0x04, 'o', 'b', 'j', '1', // key: "obj1"
+		0x17, 0x03, 'F', 'o', 'o', // TypeObject8, class "Foo" (value ID 1)
+		0x14, 0x01, // properties: 1
+		0x11, 0x01, 'x', // key: "x"
+		0x06, 0x01, // value: int 1
+		0x11, 0x04, 'o', 'b', 'j', '2', // key: "obj2"
+		0x22, 0x01, // TypeObjectRef8, ID 1 -> same object
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+
+	m := val.(map[string]any)
+	obj1, ok := m["obj1"].(map[string]any)
+	if !ok {
+		t.Fatalf("obj1: expected map, got %T", m["obj1"])
+	}
+	obj2, ok := m["obj2"].(map[string]any)
+	if !ok {
+		t.Fatalf("obj2: expected map, got %T (%v)", m["obj2"], m["obj2"])
+	}
+
+	assertEqualString(t, obj1[igbinary.ClassKey], "Foo")
+	assertEqualInt64(t, obj1["x"], 1)
+	assertEqualString(t, obj2[igbinary.ClassKey], "Foo")
+	assertEqualInt64(t, obj2["x"], 1)
+}
+
+// TestDecodeNestedArrayRefResolution tests references to nested arrays.
+func TestDecodeNestedArrayRefResolution(t *testing.T) {
+	// Outer (value ID 0) -> "inner" => inner array (value ID 1) {0=>10}
+	//                     -> "ref"   => ArrayRef8(1)
+	data := makePayload(
+		0x14, 0x02, // outer array, 2 entries (value ID 0)
+		0x11, 0x05, 'i', 'n', 'n', 'e', 'r', // key: "inner"
+		0x14, 0x01, // inner array, 1 entry (value ID 1)
+		0x06, 0x00, // key: int 0
+		0x06, 0x0A, // value: int 10
+		0x11, 0x03, 'r', 'e', 'f', // key: "ref"
+		0x01, 0x01, // TypeArrayRef8, ID 1 -> inner array
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+
+	m := val.(map[string]any)
+	inner := m["inner"].(map[string]any)
+	ref := m["ref"].(map[string]any)
+
+	assertEqualInt64(t, inner["0"], 10)
+	assertEqualInt64(t, ref["0"], 10)
+}
+
+// TestDecodeMultipleRefsToSameArray tests multiple references to the same array.
+func TestDecodeMultipleRefsToSameArray(t *testing.T) {
+	// Outer (ID 0) -> "a" => inner (ID 1) {0=>99}
+	//              -> "b" => ArrayRef8(1)
+	//              -> "c" => ArrayRef8(1)
+	data := makePayload(
+		0x14, 0x03, // outer array, 3 entries (value ID 0)
+		0x11, 0x01, 'a', // key: "a"
+		0x14, 0x01, // inner (value ID 1)
+		0x06, 0x00, 0x06, 0x63, // key 0 => 99
+		0x11, 0x01, 'b', // key: "b"
+		0x01, 0x01, // ArrayRef8(1)
+		0x11, 0x01, 'c', // key: "c"
+		0x01, 0x01, // ArrayRef8(1)
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+
+	m := val.(map[string]any)
+	a := m["a"].(map[string]any)
+	b := m["b"].(map[string]any)
+	c := m["c"].(map[string]any)
+
+	assertEqualInt64(t, a["0"], 99)
+	assertEqualInt64(t, b["0"], 99)
+	assertEqualInt64(t, c["0"], 99)
+}
+
+// TestDecodeEmptyArrayRef tests that a reference to an empty array resolves correctly.
+func TestDecodeEmptyArrayRef(t *testing.T) {
+	// Outer (ID 0) -> "empty" => empty array (ID 1) {}
+	//              -> "ref"   => ArrayRef8(1)
+	data := makePayload(
+		0x14, 0x02, // outer array, 2 entries (value ID 0)
+		0x11, 0x05, 'e', 'm', 'p', 't', 'y', // key: "empty"
+		0x14, 0x00, // empty array (value ID 1)
+		0x11, 0x03, 'r', 'e', 'f', // key: "ref"
+		0x01, 0x01, // ArrayRef8(1)
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+
+	m := val.(map[string]any)
+	empty := m["empty"].(map[string]any)
+	ref := m["ref"].(map[string]any)
+
+	if len(empty) != 0 {
+		t.Errorf("expected empty map, got %d entries", len(empty))
+	}
+	if len(ref) != 0 {
+		t.Errorf("expected empty map via ref, got %d entries", len(ref))
+	}
+}
+
+// TestDecodeValueRefOutOfRangeError tests the error type for invalid ref IDs.
+func TestDecodeValueRefOutOfRangeError(t *testing.T) {
+	// Outer (ID 0) -> "x" => ArrayRef8(5) -- ID 5 does not exist
+	data := makePayload(
+		0x14, 0x01,
+		0x11, 0x01, 'x',
+		0x01, 0x05, // ArrayRef8(5) -- out of range
+	)
+	_, err := igbinary.Decode(data)
+	if err == nil {
+		t.Fatal("expected error for out-of-range ref")
+	}
+	if !errors.Is(err, igbinary.ErrValueRefOutOfRange) {
+		t.Errorf("expected ErrValueRefOutOfRange, got: %v", err)
 	}
 }
 
