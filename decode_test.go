@@ -1449,6 +1449,150 @@ func TestDecodeValueRefOutOfRangeError(t *testing.T) {
 	}
 }
 
+// --- TypeStringEmpty dedup table tests ---
+//
+// PHP igbinary treats TypeStringEmpty (0x0D) as a special marker that does NOT
+// occupy a slot in the string deduplication table. If an empty string were
+// registered, all subsequent StringID lookups would be off by one.
+
+func TestEmptyStringValueDoesNotShiftStringIDs(t *testing.T) {
+	// Scenario: a map where a value is an empty string (TypeStringEmpty), followed
+	// by a StringID reference to a previously registered string.
+	//
+	// Without the fix, TypeStringEmpty would register as string ID 1, and the
+	// StringID8(1) on line 9 would incorrectly resolve to "" instead of "hello".
+	//
+	// Layout:
+	//   array(2)
+	//     key: String8 "key"  -> registers as string ID 0
+	//     val: String8 "hello" -> registers as string ID 1
+	//     key: String8 "empty" -> registers as string ID 2
+	//     val: StringEmpty      -> does NOT register
+	//     key: String8 "ref"   -> registers as string ID 3
+	//     val: StringID8(1)    -> should resolve to "hello" (not "")
+	data := makePayload(
+		0x14, 0x03, // array of 3 elements
+		0x11, 0x03, 'k', 'e', 'y', // key: "key" (string ID 0)
+		0x11, 0x05, 'h', 'e', 'l', 'l', 'o', // value: "hello" (string ID 1)
+		0x11, 0x05, 'e', 'm', 'p', 't', 'y', // key: "empty" (string ID 2)
+		0x0D,                               // value: TypeStringEmpty -> NOT registered
+		0x11, 0x03, 'r', 'e', 'f',         // key: "ref" (string ID 3)
+		0x0E, 0x01, // value: StringID8(1) -> should be "hello"
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+
+	m := val.(map[string]any)
+	assertEqualString(t, m["key"], "hello")
+	assertEqualString(t, m["empty"], "")
+	assertEqualString(t, m["ref"], "hello")
+}
+
+func TestEmptyStringKeyDoesNotShiftStringIDs(t *testing.T) {
+	// Scenario: empty string used as a map key (TypeStringEmpty), followed by
+	// a StringID reference to a previously registered key.
+	//
+	// Layout:
+	//   array(2)
+	//     key: String8 "first" -> registers as string ID 0
+	//     val: int 1
+	//     key: StringEmpty      -> does NOT register
+	//     val: int 2
+	//     key: StringID8(0)    -> should resolve to "first"
+	//     val: int 3            -> overwrites first entry
+	data := makePayload(
+		0x14, 0x03, // array of 3 elements
+		0x11, 0x05, 'f', 'i', 'r', 's', 't', // key: "first" (string ID 0)
+		0x06, 0x01, // value: int 1
+		0x0D,       // key: TypeStringEmpty -> NOT registered
+		0x06, 0x02, // value: int 2
+		0x0E, 0x00, // key: StringID8(0) -> should be "first"
+		0x06, 0x03, // value: int 3
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+
+	m := val.(map[string]any)
+	assertEqualInt64(t, m[""], 2)
+	assertEqualInt64(t, m["first"], 3) // overwritten by the StringID8(0) entry
+}
+
+func TestMultipleEmptyStringsDoNotShiftStringIDs(t *testing.T) {
+	// Scenario: multiple empty strings (both as keys and values) appear before
+	// a StringID reference. None should occupy a slot.
+	//
+	// Layout:
+	//   array(3)
+	//     key: String8 "name" -> string ID 0
+	//     val: String8 "Alice" -> string ID 1
+	//     key: StringEmpty     -> NOT registered
+	//     val: StringEmpty     -> NOT registered
+	//     key: String8 "ref"  -> string ID 2
+	//     val: StringID8(1)   -> should be "Alice"
+	data := makePayload(
+		0x14, 0x03, // array of 3 elements
+		0x11, 0x04, 'n', 'a', 'm', 'e', // key: "name" (string ID 0)
+		0x11, 0x05, 'A', 'l', 'i', 'c', 'e', // value: "Alice" (string ID 1)
+		0x0D, // key: TypeStringEmpty -> NOT registered
+		0x0D, // value: TypeStringEmpty -> NOT registered
+		0x11, 0x03, 'r', 'e', 'f', // key: "ref" (string ID 2)
+		0x0E, 0x01, // value: StringID8(1) -> should be "Alice"
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+
+	m := val.(map[string]any)
+	assertEqualString(t, m["name"], "Alice")
+	assertEqualString(t, m[""], "")
+	assertEqualString(t, m["ref"], "Alice")
+}
+
+func TestEmptyStringInNestedStructDoesNotShiftStringIDs(t *testing.T) {
+	// Scenario: mimics real PHP badge-like data where a nested object has an
+	// empty string value, followed by StringID references in sibling objects.
+	//
+	// Layout (simplified badges):
+	//   array(2)
+	//     key: String8 "badge1" (ID 0)
+	//     val: array(2)
+	//       key: String8 "text"  (ID 1)
+	//       val: String8 "Sale"  (ID 2)
+	//       key: String8 "icon"  (ID 3)
+	//       val: StringEmpty      -> NOT registered
+	//     key: String8 "badge2" (ID 4)
+	//     val: array(2)
+	//       key: StringID8(1)    -> "text"
+	//       val: String8 "New"   (ID 5)
+	//       key: StringID8(3)    -> "icon"
+	//       val: String8 "star"  (ID 6)
+	data := makePayload(
+		0x14, 0x02, // outer array, 2 entries
+		0x11, 0x06, 'b', 'a', 'd', 'g', 'e', '1', // key: "badge1" (string ID 0)
+		0x14, 0x02, // inner array, 2 entries
+		0x11, 0x04, 't', 'e', 'x', 't', // key: "text" (string ID 1)
+		0x11, 0x04, 'S', 'a', 'l', 'e', // value: "Sale" (string ID 2)
+		0x11, 0x04, 'i', 'c', 'o', 'n', // key: "icon" (string ID 3)
+		0x0D, // value: TypeStringEmpty -> NOT registered
+		0x11, 0x06, 'b', 'a', 'd', 'g', 'e', '2', // key: "badge2" (string ID 4)
+		0x14, 0x02, // inner array, 2 entries
+		0x0E, 0x01, // key: StringID8(1) -> "text"
+		0x11, 0x03, 'N', 'e', 'w', // value: "New" (string ID 5)
+		0x0E, 0x03, // key: StringID8(3) -> "icon"
+		0x11, 0x04, 's', 't', 'a', 'r', // value: "star" (string ID 6)
+	)
+	val, err := igbinary.Decode(data)
+	assertNoError(t, err)
+
+	m := val.(map[string]any)
+	badge1 := m["badge1"].(map[string]any)
+	badge2 := m["badge2"].(map[string]any)
+
+	assertEqualString(t, badge1["text"], "Sale")
+	assertEqualString(t, badge1["icon"], "")
+	assertEqualString(t, badge2["text"], "New")
+	assertEqualString(t, badge2["icon"], "star")
+}
+
 // --- Test helpers ---
 
 func assertNoError(t *testing.T, err error) {
