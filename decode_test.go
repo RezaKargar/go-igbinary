@@ -1475,8 +1475,8 @@ func TestEmptyStringValueDoesNotShiftStringIDs(t *testing.T) {
 		0x11, 0x03, 'k', 'e', 'y', // key: "key" (string ID 0)
 		0x11, 0x05, 'h', 'e', 'l', 'l', 'o', // value: "hello" (string ID 1)
 		0x11, 0x05, 'e', 'm', 'p', 't', 'y', // key: "empty" (string ID 2)
-		0x0D,                               // value: TypeStringEmpty -> NOT registered
-		0x11, 0x03, 'r', 'e', 'f',         // key: "ref" (string ID 3)
+		0x0D,                      // value: TypeStringEmpty -> NOT registered
+		0x11, 0x03, 'r', 'e', 'f', // key: "ref" (string ID 3)
 		0x0E, 0x01, // value: StringID8(1) -> should be "hello"
 	)
 	val, err := igbinary.Decode(data)
@@ -1533,8 +1533,8 @@ func TestMultipleEmptyStringsDoNotShiftStringIDs(t *testing.T) {
 		0x14, 0x03, // array of 3 elements
 		0x11, 0x04, 'n', 'a', 'm', 'e', // key: "name" (string ID 0)
 		0x11, 0x05, 'A', 'l', 'i', 'c', 'e', // value: "Alice" (string ID 1)
-		0x0D, // key: TypeStringEmpty -> NOT registered
-		0x0D, // value: TypeStringEmpty -> NOT registered
+		0x0D,                      // key: TypeStringEmpty -> NOT registered
+		0x0D,                      // value: TypeStringEmpty -> NOT registered
 		0x11, 0x03, 'r', 'e', 'f', // key: "ref" (string ID 2)
 		0x0E, 0x01, // value: StringID8(1) -> should be "Alice"
 	)
@@ -1572,7 +1572,7 @@ func TestEmptyStringInNestedStructDoesNotShiftStringIDs(t *testing.T) {
 		0x11, 0x04, 't', 'e', 'x', 't', // key: "text" (string ID 1)
 		0x11, 0x04, 'S', 'a', 'l', 'e', // value: "Sale" (string ID 2)
 		0x11, 0x04, 'i', 'c', 'o', 'n', // key: "icon" (string ID 3)
-		0x0D, // value: TypeStringEmpty -> NOT registered
+		0x0D,                                     // value: TypeStringEmpty -> NOT registered
 		0x11, 0x06, 'b', 'a', 'd', 'g', 'e', '2', // key: "badge2" (string ID 4)
 		0x14, 0x02, // inner array, 2 entries
 		0x0E, 0x01, // key: StringID8(1) -> "text"
