@@ -35,7 +35,8 @@ func WithStrictMode(strict bool) Option {
 // A Decoder is safe for concurrent use: each call to [Decoder.Decode] creates
 // its own internal state. The Decoder itself only holds configuration.
 type Decoder struct {
-	strict bool
+	strict    bool
+	normalize bool
 }
 
 // NewDecoder creates a new Decoder with the given options.
@@ -73,7 +74,14 @@ func (d *Decoder) Decode(data []byte) (any, error) {
 		strict: d.strict,
 	}
 
-	return r.decodeValue()
+	val, err := r.decodeValue()
+	if err != nil {
+		return nil, err
+	}
+	if d.normalize {
+		val = NormalizeArrays(val)
+	}
+	return val, nil
 }
 
 // reader holds the mutable state for a single decode operation.

@@ -105,6 +105,26 @@ codec := mc.NewCodecBuilder().
     Build()
 ```
 
+### Normalize PHP arrays
+
+PHP does not distinguish indexed arrays from associative arrays at the igbinary level — both are encoded as key-value maps. A PHP indexed array like `["a","b","c"]` decodes as `map[string]any{"0":"a","1":"b","2":"c"}`. Use `NormalizeArrays` to convert such maps back into Go slices so that JSON serialization produces JSON arrays.
+
+```go
+// Option A: manual post-processing
+val, _ := igbinary.Decode(data)
+val = igbinary.NormalizeArrays(val)
+
+// Option B: automatic via decoder option
+dec := igbinary.NewDecoder(igbinary.WithNormalizeArrays())
+val, _ := dec.Decode(data) // sequential maps are already []any
+```
+
+Rules:
+- Empty maps → `[]any{}`
+- Maps with keys `"0","1",…,"N-1"` → `[]any` of length N (recursive)
+- All other maps → left as-is, values recursively normalized
+- Non-map/non-slice values → unchanged
+
 ## Type Mapping
 
 | PHP Type   | Go Type              | Notes                                              |

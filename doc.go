@@ -35,6 +35,24 @@
 //	)
 //	val, err := dec.Decode(data)
 //
+// # Array Normalization
+//
+// PHP does not distinguish indexed arrays from associative arrays at the igbinary
+// level — both are encoded as key-value maps. A PHP indexed array like ["a","b","c"]
+// decodes as map[string]any{"0":"a","1":"b","2":"c"}. Use [NormalizeArrays] to
+// convert such maps back into Go slices ([]any) so that JSON serialization produces
+// JSON arrays instead of JSON objects.
+//
+// You can apply normalization manually:
+//
+//	val, _ := igbinary.Decode(data)
+//	val = igbinary.NormalizeArrays(val)
+//
+// Or enable it automatically via a decoder option:
+//
+//	dec := igbinary.NewDecoder(igbinary.WithNormalizeArrays())
+//	val, _ := dec.Decode(data) // sequential maps are already []any
+//
 // # Sub-packages
 //
 // The [github.com/RezaKargar/go-igbinary/memcached] sub-package provides a full
