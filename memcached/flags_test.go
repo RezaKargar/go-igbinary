@@ -3,6 +3,7 @@ package memcached_test
 import (
 	"testing"
 
+	igbinary "github.com/RezaKargar/go-igbinary"
 	"github.com/RezaKargar/go-igbinary/memcached"
 )
 
@@ -49,6 +50,101 @@ func TestIsCompressed(t *testing.T) {
 		if got != tc.expected {
 			t.Errorf("IsCompressed(0x%x) = %v, want %v", tc.flags, got, tc.expected)
 		}
+	}
+}
+
+func TestIsIgbinaryFlags(t *testing.T) {
+	tests := []struct {
+		flags    uint32
+		expected bool
+	}{
+		{memcached.FlagIgbinary, true},
+		{memcached.FlagIgbinary | memcached.FlagCompressed | memcached.FlagZlib, true},
+		{memcached.FlagIgbinary | memcached.FlagCompressed | memcached.FlagFastlz, true},
+		{memcached.FlagJSON, false},
+		{0, false},
+	}
+
+	for _, tc := range tests {
+		got := memcached.IsIgbinaryFlags(tc.flags)
+		if got != tc.expected {
+			t.Errorf("IsIgbinaryFlags(0x%x) = %v, want %v", tc.flags, got, tc.expected)
+		}
+	}
+}
+
+func TestHasIgbinaryHeader(t *testing.T) {
+	tests := []struct {
+		name     string
+		data     []byte
+		expected bool
+	}{
+		{
+			name:     "valid header",
+			data:     []byte{0x00, 0x00, 0x00, igbinary.FormatVersion, 0x06, 0x2a},
+			expected: true,
+		},
+		{
+			name:     "too short",
+			data:     []byte{0x00, 0x00, 0x00},
+			expected: false,
+		},
+		{
+			name:     "invalid version",
+			data:     []byte{0x00, 0x00, 0x00, 0x01, 0x06, 0x2a},
+			expected: false,
+		},
+		{
+			name:     "invalid prefix",
+			data:     []byte{0x01, 0x00, 0x00, igbinary.FormatVersion, 0x06, 0x2a},
+			expected: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := memcached.HasIgbinaryHeader(tc.data)
+			if got != tc.expected {
+				t.Errorf("HasIgbinaryHeader(%v) = %v, want %v", tc.data, got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestShouldTryIgbinary(t *testing.T) {
+	tests := []struct {
+		name     string
+		flags    uint32
+		data     []byte
+		expected bool
+	}{
+		{
+			name:     "igbinary flags",
+			flags:    memcached.FlagIgbinary,
+			data:     []byte("not-igbinary"),
+			expected: true,
+		},
+		{
+			name:     "igbinary header",
+			flags:    0,
+			data:     []byte{0x00, 0x00, 0x00, igbinary.FormatVersion, 0x06, 0x2a},
+			expected: true,
+		},
+		{
+			name:     "neither",
+			flags:    memcached.FlagJSON,
+			data:     []byte("json-ish"),
+			expected: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := memcached.ShouldTryIgbinary(tc.flags, tc.data)
+			if got != tc.expected {
+				t.Errorf("ShouldTryIgbinary(0x%x, %v) = %v, want %v", tc.flags, tc.data, got, tc.expected)
+			}
+		})
 	}
 }
 

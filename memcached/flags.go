@@ -11,7 +11,11 @@
 //	val, err := codec.Decode(item.Value, item.Flags)
 package memcached
 
-import "fmt"
+import (
+	"fmt"
+
+	igbinary "github.com/RezaKargar/go-igbinary"
+)
 
 // PHP memcached flag constants.
 //
@@ -47,6 +51,25 @@ const (
 // SerializerType extracts the serializer type from cache flags.
 func SerializerType(flags uint32) uint32 {
 	return flags & SerializerMask
+}
+
+// IsIgbinaryFlags returns true when flags select the igbinary serializer.
+func IsIgbinaryFlags(flags uint32) bool {
+	return SerializerType(flags) == FlagIgbinary
+}
+
+// HasIgbinaryHeader returns true when data starts with a valid igbinary header.
+func HasIgbinaryHeader(data []byte) bool {
+	return len(data) >= 4 &&
+		data[0] == 0x00 &&
+		data[1] == 0x00 &&
+		data[2] == 0x00 &&
+		data[3] == igbinary.FormatVersion
+}
+
+// ShouldTryIgbinary returns true when either flags or payload indicate igbinary.
+func ShouldTryIgbinary(flags uint32, data []byte) bool {
+	return IsIgbinaryFlags(flags) || HasIgbinaryHeader(data)
 }
 
 // IsCompressed returns true if the compressed flag is set.
